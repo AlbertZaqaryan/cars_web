@@ -45,33 +45,35 @@ jobs:
             sudo apt-get install unzip -y
           fi
 
-          # 3. Clean up the corrupted standalone binary if it exists
-          if [ -f /usr/bin/docker-compose ]; then
-            sudo rm -f /usr/bin/docker-compose
-          fi
+          # 3. Install Docker and explicitly include the Docker Compose Plugin package
+          if ! command -v docker &> /dev/null || ! docker compose version &> /dev/null; then
+            echo "Setting up official Docker repository and packages..."
+            sudo apt-get install -y ca-certificates curl gnupg
+            sudo install -m 0755 -d /etc/apt/keyrings
+            curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor --yes -o /etc/apt/keyrings/docker.gpg
+            sudo chmod a+r /etc/apt/keyrings/docker.gpg
 
-          # 4. Install Docker using official convenience script
-          if ! command -v docker &> /dev/null; then
-            echo "Docker not found. Starting installation..."
-            curl -fsSL https://get.docker.com -o get-docker.sh
-            sudo sh get-docker.sh
+            echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+            
+            sudo apt-get update -y
+            # This explicitly installs the native 'docker compose' plugin package
+            sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+            
             sudo systemctl enable docker
             sudo systemctl start docker
             sudo usermod -aG docker ${{ secrets.EC2_USER }}
-            rm get-docker.sh
           fi
 
-          # 5. Extract files
+          # 4. Extract files
           cd /home/${{ secrets.EC2_USER }}/app/
           echo "Extracting deploy.zip bundle..."
           unzip -o deploy.zip
           rm deploy.zip
 
-          # 6. Navigate into the specific directory containing docker-compose.yml
+          # 5. Navigate into the specific directory containing docker-compose.yml
           echo "Navigating to project application directory..."
           cd core
 
-          echo "Launching application containers using native compose..."
-          # Run using the system level docker command path directly to avoid session lags
+          echo "Launching application containers..."
           sudo docker compose down
           sudo docker compose up --build -d
