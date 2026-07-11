@@ -45,7 +45,7 @@ jobs:
             sudo apt-get install unzip -y
           fi
 
-          # 3. Install Docker and explicitly include the Docker Compose Plugin package
+          # 3. Setup Docker Repo and Plugins securely if missing
           if ! command -v docker &> /dev/null || ! docker compose version &> /dev/null; then
             echo "Setting up official Docker repository and packages..."
             sudo apt-get install -y ca-certificates curl gnupg
@@ -56,7 +56,6 @@ jobs:
             echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
             
             sudo apt-get update -y
-            # This explicitly installs the native 'docker compose' plugin package
             sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
             
             sudo systemctl enable docker
@@ -64,16 +63,25 @@ jobs:
             sudo usermod -aG docker ${{ secrets.EC2_USER }}
           fi
 
-          # 4. Extract files
+          # 4. Extract files sequentially (Using synchronous execution blocks)
           cd /home/${{ secrets.EC2_USER }}/app/
           echo "Extracting deploy.zip bundle..."
-          unzip -o deploy.zip
-          rm deploy.zip
+          
+          # Force foreground completion
+          sudo unzip -o deploy.zip
+          sudo rm -f deploy.zip
 
-          # 5. Navigate into the specific directory containing docker-compose.yml
+          # 5. Navigate into the application directory
           echo "Navigating to project application directory..."
           cd core
 
+          # Fix lowercase dockerfile reference inside docker-compose if it points to capital Dockerfile
+          if [ -f dockerfile ] && [ ! -f Dockerfile ]; then
+            echo "Standardizing lowercase dockerfile naming..."
+            cp dockerfile Dockerfile
+          fi
+
           echo "Launching application containers..."
-          sudo docker compose down
-          sudo docker compose up --build -d
+          # Run using exact absolute paths to prevent environment shell profile lags
+          sudo /usr/bin/docker compose down --remove-orphans
+          sudo /usr/bin/docker compose up --build -d
