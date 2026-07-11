@@ -16,7 +16,6 @@ jobs:
     - name: Create Deployment Artifact (Zip Method)
       run: |
         echo "Creating deployment package..."
-        # Exclude local virtual environments, git configurations, and cache files
         zip -r deploy.zip . -x "*.git*" "*venv*" "*__pycache__*" "*.env" "db.sqlite3"
 
     - name: Copy Zip Artifact to EC2
@@ -46,7 +45,7 @@ jobs:
             sudo apt-get install unzip -y
           fi
 
-          # 3. Robust Docker Installation using official convenience script
+          # 3. Robust Docker Installation
           if ! command -v docker &> /dev/null; then
             echo "Docker not found. Starting installation..."
             curl -fsSL https://get.docker.com -o get-docker.sh
@@ -57,12 +56,11 @@ jobs:
             rm get-docker.sh
           fi
 
-          # 4. Install Docker Compose V2 plugin into the correct system location
-          if ! docker compose version &> /dev/null; then
-            echo "Installing Docker Compose CLI plugin to standard path..."
-            sudo mkdir -p /usr/libexec/docker/cli-plugins/
-            sudo curl -SL "https://github.com/docker/compose/releases/latest/download/docker-linux-$(uname -m)" -o /usr/libexec/docker/cli-plugins/docker-compose
-            sudo chmod +x /usr/libexec/docker/cli-plugins/docker-compose
+          # 4. Install Standalone Docker Compose Binary (Bypasses session plugin issues)
+          if ! command -v docker-compose &> /dev/null; then
+            echo "Installing standalone docker-compose binary..."
+            sudo curl -SL "https://github.com/docker/compose/releases/latest/download/docker-linux-$(uname -m)" -o /usr/bin/docker-compose
+            sudo chmod +x /usr/bin/docker-compose
           fi
 
           # 5. Extract files and deploy application
@@ -73,6 +71,6 @@ jobs:
           rm deploy.zip
 
           echo "Launching application containers..."
-          # Refresh current group settings dynamically and force execution using the correct plugin path
-          sudo docker compose down
-          sudo docker compose up --build -d
+          # Execute explicitly using the standalone binary wrapper
+          sudo docker-compose down
+          sudo docker-compose up --build -d
