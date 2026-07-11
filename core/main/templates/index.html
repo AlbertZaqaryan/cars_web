@@ -1,0 +1,46 @@
+{% load static %}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Car World</title>
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+</head>
+<body>
+
+    <header>
+        <h1>🚗 Car World</h1>
+        <p>Learn about amazing cars</p>
+    </header>
+
+    <section class="cars">
+
+        <div class="card">
+            <img src="https://images.unsplash.com/photo-1492144534655-ae79c964c9d7?w=600" alt="BMW">
+            <h2>BMW</h2>
+            <p>BMW is known for luxury, performance, and sporty driving.</p>
+            <button onclick="showInfo('BMW')">More Info</button>
+        </div>
+
+        <div class="card">
+            <img src="https://images.unsplash.com/photo-1553440569-bcc63803a83d?w=600" alt="Mercedes">
+            <h2>Mercedes-Benz</h2>
+            <p>Mercedes builds comfortable and elegant luxury vehicles.</p>
+            <button onclick="showInfo('Mercedes')">More Info</button>
+        </div>
+
+        <div class="card">
+            <img src="https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=600" alt="Audi">
+            <h2>Audi</h2>
+            <p>Audi combines modern technology with premium design.</p>
+            <button onclick="showInfo('Audi')">More Info</button>
+        </div>
+
+    </section>
+
+    <script src="{% static 'js/script.js' %}"></script>
+
+</body>
+</html>
