@@ -1,0 +1,81 @@
+name: Django CI/CD Pipeline to AWS EC2
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Create Deployment Artifact (Zip Method)
+      run: |
+        echo "Creating deployment package..."
+        # Exclude local virtual environments, git files, and cache to keep the file small
+        zip -r deploy.zip . -x "*.git*" "*venv*" "*__pycache__*" "*.env" "db.sqlite3"
+
+    - name: Copy Zip Artifact to EC2
+      uses: appleboy/scp-action@v0.1.7
+      with:
+        host: ${{ secrets.EC2_HOST }}
+        username: ${{ secrets.EC2_USER }}
+        key: ${{ secrets.EC2_SSH_KEY }}
+        port: 22
+        source: "deploy.zip"
+        target: "/home/${{ secrets.EC2_USER }}/app/"
+
+    - name: SSH into EC2, Install Docker, Unzip, and Run Application
+      uses: appleboy/ssh-action@v1.0.3
+      with:
+        host: ${{ secrets.EC2_HOST }}
+        username: ${{ secrets.EC2_USER }}
+        key: ${{ secrets.EC2_SSH_KEY }}
+        port: 22
+        script: |
+          # 1. Update system packages
+          sudo apt-get update -y
+
+          # 2. Check and Install unzip if missing
+          if ! command -v unzip &> /dev/null; then
+            echo "Installing unzip..."
+            sudo apt-get install unzip -y
+          fi
+
+          # 3. Check and Install Docker if missing
+          if ! command -v docker &> /dev/null; then
+            echo "Installing Docker..."
+            sudo apt-get install -y apt-transport-https ca-certificates curl software-properties-common
+            curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+            echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.gnu/docker.list > /dev/null
+            sudo apt-get update -y
+            sudo apt-get install -y docker-ce docker-ce-cli containerd.io
+            sudo systemctl enable docker
+            sudo systemctl start docker
+            # Add user to docker group so sudo isn't required for commands later
+            sudo usermod -aG docker ${{ secrets.EC2_USER }}
+          fi
+
+          # 4. Check and Install Docker Compose (V2 plugin) if missing
+          if ! docker compose version &> /dev/null; then
+            echo "Installing Docker Compose V2..."
+            sudo mkdir -p /usr/local/lib/docker/cli-plugins/
+            sudo curl -SL "https://github.com/docker/compose/releases/latest/download/docker-linux-$(uname -m)" -o /usr/local/lib/docker/cli-plugins/docker-compose
+            sudo chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+          fi
+
+          # 5. Extract files and deploy application
+          cd /home/${{ secrets.EC2_USER }}/app/
+          
+          echo "Extracting deployment package..."
+          unzip -o deploy.zip
+          rm deploy.zip # Clean up the zip file
+
+          echo "Starting application containers..."
+          # Force build to apply changes and run detached (-d)
+          sudo docker compose down
+          sudo docker compose up --build -d
