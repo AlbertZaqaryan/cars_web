@@ -83,5 +83,4 @@ jobs:
 
           echo "Launching application containers..."
           # Run using exact absolute paths to prevent environment shell profile lags
-          sudo /usr/bin/docker compose down --remove-orphans
-          sudo /usr/bin/docker compose up --build -d
+          sudo docker compose up --build -d
